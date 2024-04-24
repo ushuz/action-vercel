@@ -1,7 +1,6 @@
 const core = require('@actions/core')
 const github = require('@actions/github')
 const parser = require('action-input-parser')
-require('dotenv').config()
 
 const context = {
 	GITHUB_TOKEN: parser.getInput({
