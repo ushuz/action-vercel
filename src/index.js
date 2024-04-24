@@ -63,24 +63,21 @@ const run = async () => {
 
 		const deploymentUrls = []
 
-		if (ALIAS_DOMAINS) {
-			core.info(`Assigning alias domains to Vercel deployment`)
+		for (const domain of ALIAS_DOMAINS) {
+			// skip non-string or empty domains
+			if (typeof domain !== 'string' || !domain.trim()) continue
 
-			if (!Array.isArray(ALIAS_DOMAINS)) {
-				throw new Error(`invalid type for ALIAS_DOMAINS`)
-			}
+			core.info(`Assigning alias domains to Vercel deployment: ${ domain }`)
+			const alias = domain
+				.replace('{USER}', urlSafeParameter(USER))
+				.replace('{REPO}', urlSafeParameter(REPOSITORY))
+				.replace('{BRANCH}', urlSafeParameter(BRANCH))
+				.replace('{SHA}', SHA.substring(0, 7))
+				.toLowerCase()
+				.trim()
 
-			for (let i = 0; i < ALIAS_DOMAINS.length; i++) {
-				const alias = ALIAS_DOMAINS[i]
-					.replace('{USER}', urlSafeParameter(USER))
-					.replace('{REPO}', urlSafeParameter(REPOSITORY))
-					.replace('{BRANCH}', urlSafeParameter(BRANCH))
-					.replace('{SHA}', SHA.substring(0, 7))
-					.toLowerCase()
-
-				await vercel.assignAlias(alias)
-				deploymentUrls.push(addSchema(alias))
-			}
+			await vercel.assignAlias(alias)
+			deploymentUrls.push(addSchema(alias))
 		}
 
 		deploymentUrls.push(addSchema(deploymentUrl))

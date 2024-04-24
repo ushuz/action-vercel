@@ -58,6 +58,7 @@ const context = {
 	}),
 	ALIAS_DOMAINS: parser.getInput({
 		key: 'ALIAS_DOMAINS',
+		default: [],
 		type: 'array',
 		disableable: true
 	}),
