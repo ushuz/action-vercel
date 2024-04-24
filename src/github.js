@@ -8,7 +8,6 @@ const {
 	PR_NUMBER,
 	REF,
 	LOG_URL,
-	PR_LABELS,
 	GITHUB_DEPLOYMENT_ENV
 } = require('./config')
 
@@ -84,17 +83,6 @@ const init = () => {
 		return comment.data
 	}
 
-	const addLabel = async () => {
-		const label = await client.issues.addLabels({
-			owner: USER,
-			repo: REPOSITORY,
-			issue_number: PR_NUMBER,
-			labels: PR_LABELS
-		})
-
-		return label.data
-	}
-
 	const getCommit = async () => {
 		const { data } = await client.repos.getCommit({
 			owner: USER,
@@ -115,7 +103,6 @@ const init = () => {
 		updateDeployment,
 		deleteExistingComment,
 		createComment,
-		addLabel,
 		getCommit
 	}
 }
