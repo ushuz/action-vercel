@@ -101,11 +101,11 @@ const setDynamicVars = () => {
 
 	context.ACTOR = github.context.actor
 	context.REF = github.context.ref
-	context.REF_NAME = github.context.ref_name
+	context.REF_NAME = process.env.GITHUB_REF_NAME
 	context.SHA = github.context.sha
 
 	context.PR_NUMBER = github.context.payload.number
-	context.BRANCH = context.PR_NUMBER ? github.context.head_ref : context.REF_NAME
+	context.BRANCH = context.PR_NUMBER ? process.env.GITHUB_HEAD_REF : context.REF_NAME
 	context.IS_FORK = context.PR_NUMBER ? github.context.payload.head.repo.full_name !== context.GITHUB_REPOSITORY : undefined
 }
 
