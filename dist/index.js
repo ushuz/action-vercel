@@ -18244,6 +18244,7 @@ const context = {
 	}),
 	ALIAS_DOMAINS: parser.getInput({
 		key: 'ALIAS_DOMAINS',
+		default: [],
 		type: 'array',
 		disableable: true
 	}),
@@ -18325,7 +18326,6 @@ const {
 	PR_NUMBER,
 	REF,
 	LOG_URL,
-	PR_LABELS,
 	GITHUB_DEPLOYMENT_ENV
 } = __nccwpck_require__(4570)
 
@@ -18401,17 +18401,6 @@ const init = () => {
 		return comment.data
 	}
 
-	const addLabel = async () => {
-		const label = await client.issues.addLabels({
-			owner: USER,
-			repo: REPOSITORY,
-			issue_number: PR_NUMBER,
-			labels: PR_LABELS
-		})
-
-		return label.data
-	}
-
 	const getCommit = async () => {
 		const { data } = await client.repos.getCommit({
 			owner: USER,
@@ -18432,7 +18421,6 @@ const init = () => {
 		updateDeployment,
 		deleteExistingComment,
 		createComment,
-		addLabel,
 		getCommit
 	}
 }
@@ -18873,24 +18861,21 @@ const run = async () => {
 
 		const deploymentUrls = []
 
-		if (ALIAS_DOMAINS) {
-			core.info(`Assigning alias domains to Vercel deployment`)
+		for (const domain of ALIAS_DOMAINS) {
+			// skip non-string or empty domains
+			if (typeof domain !== 'string' || !domain.trim()) continue
 
-			if (!Array.isArray(ALIAS_DOMAINS)) {
-				throw new Error(`invalid type for ALIAS_DOMAINS`)
-			}
+			core.info(`Assigning alias domains to Vercel deployment: ${ domain }`)
+			const alias = domain
+				.replace('{USER}', urlSafeParameter(USER))
+				.replace('{REPO}', urlSafeParameter(REPOSITORY))
+				.replace('{BRANCH}', urlSafeParameter(BRANCH))
+				.replace('{SHA}', SHA.substring(0, 7))
+				.toLowerCase()
+				.trim()
 
-			for (let i = 0; i < ALIAS_DOMAINS.length; i++) {
-				const alias = ALIAS_DOMAINS[i]
-					.replace('{USER}', urlSafeParameter(USER))
-					.replace('{REPO}', urlSafeParameter(REPOSITORY))
-					.replace('{BRANCH}', urlSafeParameter(BRANCH))
-					.replace('{SHA}', SHA.substring(0, 7))
-					.toLowerCase()
-
-				await vercel.assignAlias(alias)
-				deploymentUrls.push(addSchema(alias))
-			}
+			await vercel.assignAlias(alias)
+			deploymentUrls.push(addSchema(alias))
 		}
 
 		deploymentUrls.push(addSchema(deploymentUrl))
