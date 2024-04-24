@@ -5,7 +5,6 @@ const {
 	USER,
 	REPOSITORY,
 	PRODUCTION,
-	PR_NUMBER,
 	REF,
 	LOG_URL,
 	GITHUB_DEPLOYMENT_ENV
@@ -48,11 +47,11 @@ const init = () => {
 		return deploymentStatus.data
 	}
 
-	const deleteExistingComment = async () => {
+	const deleteExistingComment = async (number) => {
 		const { data } = await client.issues.listComments({
 			owner: USER,
 			repo: REPOSITORY,
-			issue_number: PR_NUMBER
+			issue_number: number
 		})
 
 		if (data.length < 1) return
@@ -69,14 +68,14 @@ const init = () => {
 		}
 	}
 
-	const createComment = async (body) => {
+	const createComment = async (number, body) => {
 		// Remove indentation
 		const dedented = body.replace(/^[^\S\n]+/gm, '')
 
 		const comment = await client.issues.createComment({
 			owner: USER,
 			repo: REPOSITORY,
-			issue_number: PR_NUMBER,
+			issue_number: number,
 			body: dedented
 		})
 

@@ -1,21 +1,18 @@
 const core = require('@actions/core')
-const Github = require('./github')
+const GitHub = require('./github')
 const Vercel = require('./vercel')
 const { addSchema } = require('./helpers')
 
 const {
 	GITHUB_DEPLOYMENT,
+	GITHUB_REPOSITORY,
 	USER,
 	REPOSITORY,
-	BRANCH,
-	PR_NUMBER,
 	SHA,
 	CREATE_COMMENT,
 	DELETE_EXISTING_COMMENT,
 	ALIAS_DOMAINS,
 	LOG_URL,
-	DEPLOY_PR_FROM_FORK,
-	IS_FORK,
 	ACTOR
 } = require('./config')
 
@@ -23,18 +20,28 @@ const {
 const urlSafeParameter = (input) => input.replace(/[^a-z0-9_~]/gi, '-')
 
 const run = async () => {
-	const github = Github.init()
+	const github = GitHub.init()
+	const octokit = github.client
+
+	const { data: pulls } = await octokit.rest.repos.listPullRequestsAssociatedWithCommit({
+		owner: USER,
+		repo: REPOSITORY,
+		commit_sha: SHA
+	})
+	// keep only open PRs, newest first
+	const openPulls = pulls.filter((p) => p.state === 'open').toSorted((a, b) => b.number - a.number)
+
+	const pull = openPulls.length ? openPulls[0] : undefined
+	const pullNumber = pull ? pull.number : undefined
+	const fromFork = pullNumber ? pull.head.repo.full_name !== GITHUB_REPOSITORY : undefined
+	const BRANCH = pullNumber ? pull.head.ref : process.env.GITHUB_REF_NAME
 
 	// Refuse to deploy an untrusted fork
-	if (IS_FORK === true && DEPLOY_PR_FROM_FORK === false) {
+	if (fromFork === true) {
 		core.warning(`PR is from fork and DEPLOY_PR_FROM_FORK is set to false`)
-		const body = `
-			Refusing to deploy this Pull Request to Vercel because it originates from @${ ACTOR }'s fork.
+		const body = `Refusing to deploy this Pull Request to Vercel because it originates from @${ ACTOR }'s fork.`
 
-			**@${ USER }** To allow this behaviour set \`DEPLOY_PR_FROM_FORK\` to true ([more info](https://github.com/BetaHuhn/deploy-to-vercel-action#deploying-a-pr-made-from-a-fork-or-dependabot)).
-		`
-
-		const comment = await github.createComment(body)
+		const comment = await github.createComment(pullNumber, body)
 		core.info(`Comment created: ${ comment.html_url }`)
 
 		core.setOutput('DEPLOYMENT_CREATED', false)
@@ -91,12 +98,13 @@ const run = async () => {
 			await github.updateDeployment('success', previewUrl)
 		}
 
-		if (PR_NUMBER) {
+		let commentCreated = false
+
+		if (pullNumber) {
 			if (DELETE_EXISTING_COMMENT) {
 				core.info('Checking for existing comment on PR')
-				const deletedCommentId = await github.deleteExistingComment()
-
-				if (deletedCommentId) core.info(`Deleted existing comment #${ deletedCommentId }`)
+				const deletedCommentId = await github.deleteExistingComment(pullNumber)
+				if (deletedCommentId) core.info(`Deleted existing comment: ${ deletedCommentId }`)
 			}
 
 			if (CREATE_COMMENT) {
@@ -122,8 +130,9 @@ const run = async () => {
 					[View Workflow Logs](${ LOG_URL })
 				`
 
-				const comment = await github.createComment(body)
+				const comment = await github.createComment(pullNumber, body)
 				core.info(`Comment created: ${ comment.html_url }`)
+				commentCreated = true
 			}
 		}
 
@@ -133,7 +142,7 @@ const run = async () => {
 		core.setOutput('DEPLOYMENT_ID', deployment.id)
 		core.setOutput('DEPLOYMENT_INSPECTOR_URL', deployment.inspectorUrl)
 		core.setOutput('DEPLOYMENT_CREATED', true)
-		core.setOutput('COMMENT_CREATED', PR_NUMBER && CREATE_COMMENT)
+		core.setOutput('COMMENT_CREATED', commentCreated)
 
 		core.info('Done')
 	} catch (err) {
