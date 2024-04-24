@@ -8,11 +8,6 @@ const {
 	VERCEL_SCOPE,
 	VERCEL_ORG_ID,
 	VERCEL_PROJECT_ID,
-	SHA,
-	USER,
-	REPOSITORY,
-	REF,
-	TRIM_COMMIT_MESSAGE,
 	BUILD_ENV,
 	PREBUILT,
 	WORKING_DIRECTORY,
@@ -26,7 +21,7 @@ const init = () => {
 
 	let deploymentUrl
 
-	const deploy = async (commit) => {
+	const deploy = async () => {
 		let commandArguments = [ `--token=${ VERCEL_TOKEN }` ]
 
 		if (VERCEL_SCOPE) {
@@ -43,25 +38,6 @@ const init = () => {
 
 		if (FORCE) {
 			commandArguments.push('--force')
-		}
-
-		if (commit) {
-			const metadata = [
-				`githubCommitAuthorName=${ commit.authorName }`,
-				`githubCommitAuthorLogin=${ commit.authorLogin }`,
-				`githubCommitMessage=${ TRIM_COMMIT_MESSAGE ? commit.commitMessage.split(/\r?\n/)[0] : commit.commitMessage }`,
-				`githubCommitOrg=${ USER }`,
-				`githubCommitRepo=${ REPOSITORY }`,
-				`githubCommitRef=${ REF }`,
-				`githubCommitSha=${ SHA }`,
-				`githubOrg=${ USER }`,
-				`githubRepo=${ REPOSITORY }`,
-				`githubDeployment=1`
-			]
-
-			metadata.forEach((item) => {
-				commandArguments = commandArguments.concat([ '--meta', item ])
-			})
 		}
 
 		if (BUILD_ENV) {

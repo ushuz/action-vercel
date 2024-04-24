@@ -2,7 +2,6 @@ const core = require('@actions/core')
 const Github = require('./github')
 const Vercel = require('./vercel')
 const { addSchema } = require('./helpers')
-const crypto = require('crypto')
 
 const {
 	GITHUB_DEPLOYMENT,
@@ -11,13 +10,9 @@ const {
 	BRANCH,
 	PR_NUMBER,
 	SHA,
-	IS_PR,
-	PR_LABELS,
 	CREATE_COMMENT,
 	DELETE_EXISTING_COMMENT,
-	PR_PREVIEW_DOMAIN,
 	ALIAS_DOMAINS,
-	ATTACH_COMMIT_METADATA,
 	LOG_URL,
 	DEPLOY_PR_FROM_FORK,
 	IS_FORK,
@@ -62,56 +57,17 @@ const run = async () => {
 	try {
 		core.info(`Creating deployment with Vercel CLI`)
 		const vercel = Vercel.init()
-
-		const commit = ATTACH_COMMIT_METADATA ? await github.getCommit() : undefined
-		const deploymentUrl = await vercel.deploy(commit)
+		const deploymentUrl = await vercel.deploy()
 
 		core.info('Successfully deployed to Vercel!')
 
 		const deploymentUrls = []
-		if (IS_PR && PR_PREVIEW_DOMAIN) {
-			core.info(`Assigning custom preview domain to PR`)
 
-			if (typeof PR_PREVIEW_DOMAIN !== 'string') {
-				throw new Error(`invalid type for PR_PREVIEW_DOMAIN`)
-			}
-
-			const alias = PR_PREVIEW_DOMAIN.replace('{USER}', urlSafeParameter(USER))
-				.replace('{REPO}', urlSafeParameter(REPOSITORY))
-				.replace('{BRANCH}', urlSafeParameter(BRANCH))
-				.replace('{PR}', PR_NUMBER)
-				.replace('{SHA}', SHA.substring(0, 7))
-				.toLowerCase()
-
-			const previewDomainSuffix = '.vercel.app'
-			let nextAlias = alias
-
-
-			if (alias.endsWith(previewDomainSuffix)) {
-				let prefix = alias.substring(0, alias.indexOf(previewDomainSuffix))
-
-				if (prefix.length >= 60) {
-					core.warning(`The alias ${ prefix } exceeds 60 chars in length, truncating using vercel's rules. See https://vercel.com/docs/concepts/deployments/automatic-urls#automatic-branch-urls`)
-					prefix = prefix.substring(0, 55)
-					const uniqueSuffix = crypto.createHash('sha256')
-						.update(`git-${ BRANCH }-${ REPOSITORY }`)
-						.digest('hex')
-						.slice(0, 6)
-
-					nextAlias = `${ prefix }-${ uniqueSuffix }${ previewDomainSuffix }`
-					core.info(`Updated domain alias: ${ nextAlias }`)
-				}
-			}
-
-			await vercel.assignAlias(nextAlias)
-			deploymentUrls.push(addSchema(nextAlias))
-		}
-
-		if (!IS_PR && ALIAS_DOMAINS) {
-			core.info(`Assigning custom domains to Vercel deployment`)
+		if (ALIAS_DOMAINS) {
+			core.info(`Assigning alias domains to Vercel deployment`)
 
 			if (!Array.isArray(ALIAS_DOMAINS)) {
-				throw new Error(`invalid type for PR_PREVIEW_DOMAIN`)
+				throw new Error(`invalid type for ALIAS_DOMAINS`)
 			}
 
 			for (let i = 0; i < ALIAS_DOMAINS.length; i++) {
@@ -123,7 +79,6 @@ const run = async () => {
 					.toLowerCase()
 
 				await vercel.assignAlias(alias)
-
 				deploymentUrls.push(addSchema(alias))
 			}
 		}
@@ -139,7 +94,7 @@ const run = async () => {
 			await github.updateDeployment('success', previewUrl)
 		}
 
-		if (IS_PR) {
+		if (PR_NUMBER) {
 			if (DELETE_EXISTING_COMMENT) {
 				core.info('Checking for existing comment on PR')
 				const deletedCommentId = await github.deleteExistingComment()
@@ -173,13 +128,6 @@ const run = async () => {
 				const comment = await github.createComment(body)
 				core.info(`Comment created: ${ comment.html_url }`)
 			}
-
-			if (PR_LABELS) {
-				core.info('Adding label(s) to PR')
-				const labels = await github.addLabel()
-
-				core.info(`Label(s) "${ labels.map((label) => label.name).join(', ') }" added`)
-			}
 		}
 
 		core.setOutput('PREVIEW_URL', previewUrl)
@@ -188,7 +136,7 @@ const run = async () => {
 		core.setOutput('DEPLOYMENT_ID', deployment.id)
 		core.setOutput('DEPLOYMENT_INSPECTOR_URL', deployment.inspectorUrl)
 		core.setOutput('DEPLOYMENT_CREATED', true)
-		core.setOutput('COMMENT_CREATED', IS_PR && CREATE_COMMENT)
+		core.setOutput('COMMENT_CREATED', PR_NUMBER && CREATE_COMMENT)
 
 		core.info('Done')
 	} catch (err) {
